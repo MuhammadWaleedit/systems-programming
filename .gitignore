@@ -4,6 +4,9 @@ build/
 *.o
 *.obj
 
+# Generated test data and results
+data/
+
 # IDE files
 .vscode/
 .idea/
