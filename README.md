@@ -19,6 +19,63 @@ All results use a 10-point grading scale.
 - [v0.1](#v01) - `Person` class, manual/random/file input, average or median.
 - [v0.2](#v02) - refactoring into header files, exception handling, test file
   generation, splitting students into failed/passed, speed analysis.
+- [v0.25](#v025) - the same program with `std::list` and `std::deque`,
+  speed analysis of all three containers.
+
+## v0.25
+
+### Changes
+
+- Reading, sorting, splitting and writing are now function templates, so the
+  same code works with `std::vector`, `std::list` and `std::deque`:
+  - `include/FileIO.h` - `readStudents<Container>()`, `writeStudents<Container>()`;
+  - `include/Processing.h` - `sortByFinal`, `sortByName`, `sortBySurname`,
+    `splitStudents` (`src/Processing.cpp` was removed - template code lives in
+    the header).
+- `std::list` has no random access iterators, so `std::sort` cannot be used;
+  `sortStudents()` calls `list::sort()` for lists (`if constexpr` + an `IsList`
+  type trait) and `std::sort` for the other containers.
+- Menu option `5` asks which container to test: `std::vector`, `std::list`,
+  `std::deque` or all three.
+
+### Speed analysis (`std::vector` vs `std::list` vs `std::deque`)
+
+Test system: AMD Ryzen 5 5600X (6 cores), 16 GB RAM, NVMe SSD, Windows 11,
+g++ 16.2 (MinGW-w64), `-O2`. Final points by average. Same five data files.
+
+| Container | Records | Read (s) | Sort (s) | Split (s) | Write failed (s) | Write passed (s) | Total (s) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| std::vector | 1 000 | 0.0010 | 0.0003 | 0.0001 | 0.0007 | 0.0008 | 0.0029 |
+| std::vector | 10 000 | 0.0058 | 0.0014 | 0.0010 | 0.0033 | 0.0039 | 0.0155 |
+| std::vector | 100 000 | 0.0589 | 0.0172 | 0.0195 | 0.0270 | 0.0378 | 0.1603 |
+| std::vector | 1 000 000 | 0.5609 | 0.2183 | 0.2153 | 0.2562 | 0.3490 | 1.5997 |
+| std::vector | 10 000 000 | 5.4425 | 2.5708 | 2.2089 | 2.5109 | 3.4711 | 16.2042 |
+| std::list | 1 000 | 0.0014 | 0.0001 | 0.0002 | 0.0009 | 0.0009 | 0.0034 |
+| std::list | 10 000 | 0.0087 | 0.0017 | 0.0022 | 0.0043 | 0.0053 | 0.0221 |
+| std::list | 100 000 | 0.0818 | 0.0192 | 0.0210 | 0.0266 | 0.0377 | 0.1862 |
+| std::list | 1 000 000 | 0.5445 | 0.4780 | 0.2312 | 0.2621 | 0.3712 | 1.8871 |
+| std::list | 10 000 000 | 5.3634 | 8.9626 | 2.7285 | 2.6552 | 3.8574 | 23.5672 |
+| std::deque | 1 000 | 0.0007 | 0.0001 | 0.0001 | 0.0008 | 0.0006 | 0.0024 |
+| std::deque | 10 000 | 0.0049 | 0.0015 | 0.0010 | 0.0030 | 0.0040 | 0.0143 |
+| std::deque | 100 000 | 0.0513 | 0.0191 | 0.0170 | 0.0267 | 0.0365 | 0.1506 |
+| std::deque | 1 000 000 | 0.5255 | 0.3182 | 0.2081 | 0.2614 | 0.3695 | 1.6826 |
+| std::deque | 10 000 000 | 5.1920 | 3.5937 | 2.1472 | 2.5873 | 3.6131 | 17.1332 |
+
+### Conclusions
+
+- **Reading** takes about the same time with all three containers - most of
+  the time is spent parsing lines and creating `Person` objects. `std::vector`
+  also has to move all elements when it grows; `std::list` and `std::deque`
+  never move existing elements.
+- **Sorting** is where the containers differ most. `std::vector` is fastest:
+  elements are stored contiguously, which suits the CPU cache. `std::deque`
+  is about 1.4x slower (its elements are stored in blocks, so iterators do
+  more work). `std::list::sort()` is about 3.5x slower on 10 000 000 records:
+  the nodes are scattered in memory, so almost every comparison is a cache miss.
+- **Splitting** and **writing** take about the same time with all three
+  containers, because they only go through the elements once from start to end.
+- Overall `std::vector` is the best choice for this task, `std::deque` is
+  close behind, and `std::list` is the slowest.
 
 ## v0.2
 

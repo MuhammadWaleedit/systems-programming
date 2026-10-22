@@ -3,14 +3,11 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
-#include <fstream>
-#include <stdexcept>
 
 namespace {
 const size_t kBufferSize = 1 << 20;  // write in 1 MB chunks
+}  // namespace
 
-// Splits "Name Surname HW1 ... HWn Exam" into its parts.
-// Throws std::invalid_argument if the line is not in this format.
 void parseLine(const std::string& line, std::string& firstName, std::string& lastName,
                std::vector<int>& results) {
     const char* p = line.c_str();
@@ -42,7 +39,13 @@ void parseLine(const std::string& line, std::string& firstName, std::string& las
     if (results.size() < 2)
         throw std::invalid_argument("Line needs at least one homework result and an exam result");
 }
-}  // namespace
+
+void flushBuffer(std::ofstream& file, std::string& buffer, bool force) {
+    if (force || buffer.size() >= kBufferSize) {
+        file.write(buffer.data(), buffer.size());
+        buffer.clear();
+    }
+}
 
 void generateStudentFile(const std::string& fileName, size_t count, int homeworkCount) {
     std::ofstream file(fileName, std::ios::binary);
@@ -68,66 +71,23 @@ void generateStudentFile(const std::string& fileName, size_t count, int homework
             buffer.append(text, length);
         }
         buffer += '\n';
-
-        if (buffer.size() >= kBufferSize) {
-            file.write(buffer.data(), buffer.size());
-            buffer.clear();
-        }
+        flushBuffer(file, buffer, false);
     }
-    file.write(buffer.data(), buffer.size());
+    flushBuffer(file, buffer, true);
     if (!file) throw std::runtime_error("Failed writing to file " + fileName);
 }
 
-std::vector<Person> readStudents(const std::string& fileName, size_t& skippedLines) {
-    std::ifstream file(fileName);
-    if (!file) throw std::runtime_error("Cannot open file " + fileName);
-
-    std::vector<Person> students;
-    skippedLines = 0;
-
-    std::string line, firstName, lastName;
-    std::vector<int> results;
-    std::getline(file, line);  // skip header
-
-    while (std::getline(file, line)) {
-        if (line.find_first_not_of(" \t\r") == std::string::npos) continue;  // empty line
-        try {
-            parseLine(line, firstName, lastName, results);
-            int exam = results.back();
-            results.pop_back();
-            students.emplace_back(firstName, lastName, results, exam);
-        } catch (const std::invalid_argument&) {
-            ++skippedLines;
-        } catch (const std::out_of_range&) {
-            ++skippedLines;
-        }
-    }
-    return students;
+std::string outputHeader(Method method) {
+    const char* final = method == Method::Average ? "Final (Avg.)" : "Final (Med.)";
+    char text[64];
+    int length = std::snprintf(text, sizeof(text), "%-16s%-17s%12s\n", "Name", "Surname", final);
+    return std::string(text, length);
 }
 
-void writeStudents(const std::string& fileName, const std::vector<Person>& students, Method method) {
-    std::ofstream file(fileName, std::ios::binary);
-    if (!file) throw std::runtime_error("Cannot create file " + fileName);
-
-    std::string buffer;
-    buffer.reserve(kBufferSize + 256);
+void appendOutputLine(std::string& buffer, const Person& person, Method method) {
     char text[128];
-
-    const char* header = method == Method::Average ? "Final (Avg.)" : "Final (Med.)";
-    int length = std::snprintf(text, sizeof(text), "%-16s%-17s%12s\n", "Name", "Surname", header);
-    buffer.append(text, length);
-
-    for (const Person& person : students) {
-        length = std::snprintf(text, sizeof(text), "%-16s%-17s%12.2f\n",
+    int length = std::snprintf(text, sizeof(text), "%-16s%-17s%12.2f\n",
                                person.firstName().c_str(), person.lastName().c_str(),
                                person.finalPoints(method));
-        buffer.append(text, length);
-
-        if (buffer.size() >= kBufferSize) {
-            file.write(buffer.data(), buffer.size());
-            buffer.clear();
-        }
-    }
-    file.write(buffer.data(), buffer.size());
-    if (!file) throw std::runtime_error("Failed writing to file " + fileName);
+    buffer.append(text, length);
 }

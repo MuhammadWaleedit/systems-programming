@@ -14,7 +14,6 @@ add_executable(final_points
     src/Grades.cpp
     src/Input.cpp
     src/FileIO.cpp
-    src/Processing.cpp
 )
 target_include_directories(final_points PRIVATE include)
 

@@ -1,6 +1,8 @@
+#include <deque>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -87,7 +89,7 @@ void enterStudents(bool randomResults) {
 void readAndPrint() {
     std::string fileName = askFileName("Students.txt");
     size_t skipped = 0;
-    std::vector<Person> students = readStudents(fileName, skipped);
+    std::vector<Person> students = readStudents<std::vector<Person>>(fileName, skipped);
     if (skipped > 0) std::cout << "Skipped " << skipped << " invalid line(s).\n";
     if (students.empty()) throw std::runtime_error("No students found in " + fileName);
     sortForPrinting(students);
@@ -106,16 +108,19 @@ void generateTestFiles() {
 }
 
 struct Timings {
+    std::string container;
     size_t records = 0;
     double read = 0, sort = 0, split = 0, writeFailed = 0, writePassed = 0, total = 0;
 };
 
+template <typename Container>
 Timings analyseFile(const std::string& fileName, Method method) {
     Timings t;
+    t.container = containerName<Container>();
     Timer total, step;
 
     size_t skipped = 0;
-    std::vector<Person> students = readStudents(fileName, skipped);
+    Container students = readStudents<Container>(fileName, skipped);
     t.read = step.elapsed();
     t.records = students.size();
 
@@ -124,7 +129,7 @@ Timings analyseFile(const std::string& fileName, Method method) {
     t.sort = step.elapsed();
 
     step.reset();
-    std::vector<Person> failed, passed;
+    Container failed, passed;
     splitStudents(students, method, failed, passed);
     t.split = step.elapsed();
 
@@ -138,7 +143,7 @@ Timings analyseFile(const std::string& fileName, Method method) {
 
     t.total = total.elapsed();
 
-    std::cout << "\n" << fileName << " (" << t.records << " records";
+    std::cout << "\n" << t.container << ": " << fileName << " (" << t.records << " records";
     if (skipped > 0) std::cout << ", " << skipped << " invalid lines skipped";
     std::cout << ")\n" << std::right << std::fixed << std::setprecision(4)
               << "  Read from file:      " << t.read << " s\n"
@@ -150,24 +155,35 @@ Timings analyseFile(const std::string& fileName, Method method) {
     return t;
 }
 
-void performanceAnalysis() {
-    Method method = askMethod();
-    std::vector<Timings> results;
+template <typename Container>
+void analyseAllFiles(Method method, std::vector<Timings>& results) {
     for (size_t size : kTestSizes) {
         try {
-            results.push_back(analyseFile(testFileName(size), method));
+            results.push_back(analyseFile<Container>(testFileName(size), method));
         } catch (const std::runtime_error& e) {
             std::cout << "\n" << e.what() << " - generate the test files first (option 4).\n";
         }
     }
+}
+
+void performanceAnalysis() {
+    std::cout << "Container: 1 - std::vector, 2 - std::list, 3 - std::deque, 4 - all three: ";
+    int container = readNumber(std::cin, 1, 4);
+    Method method = askMethod();
+
+    std::vector<Timings> results;
+    if (container == 1 || container == 4) analyseAllFiles<std::vector<Person>>(method, results);
+    if (container == 2 || container == 4) analyseAllFiles<std::list<Person>>(method, results);
+    if (container == 3 || container == 4) analyseAllFiles<std::deque<Person>>(method, results);
 
     // Summary table (Markdown), ready to paste into README.
-    std::cout << "\n| Records | Read (s) | Sort (s) | Split (s) | Write failed (s) | Write passed (s) | Total (s) |\n"
-              << "|---:|---:|---:|---:|---:|---:|---:|\n";
+    std::cout << "\n| Container | Records | Read (s) | Sort (s) | Split (s) | Write failed (s) | Write passed (s) | Total (s) |\n"
+              << "|---|---:|---:|---:|---:|---:|---:|---:|\n";
     for (const Timings& t : results) {
         std::cout << std::fixed << std::setprecision(4)
-                  << "| " << t.records << " | " << t.read << " | " << t.sort << " | " << t.split
-                  << " | " << t.writeFailed << " | " << t.writePassed << " | " << t.total << " |\n";
+                  << "| " << t.container << " | " << t.records << " | " << t.read << " | " << t.sort
+                  << " | " << t.split << " | " << t.writeFailed << " | " << t.writePassed
+                  << " | " << t.total << " |\n";
     }
 }
 }  // namespace
