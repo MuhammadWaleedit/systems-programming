@@ -1,11 +1,21 @@
 #include <algorithm>
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <string>
 #include <vector>
 
 enum class Method { Average, Median };
+
+// Random results from 1 to 10, seeded with the current time.
+int randomResult() {
+    static std::mt19937 engine(
+        static_cast<unsigned>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
+    static std::uniform_int_distribution<int> distribution(1, 10);
+    return distribution(engine);
+}
 
 double average(const std::vector<int>& values) {
     if (values.empty()) return 0.0;
@@ -132,14 +142,42 @@ Method askMethod() {
     }
 }
 
-int main() {
-    std::vector<Person> students;
+// Asks only for the name; homework and exam results are generated randomly.
+Person generatePerson() {
+    std::string firstName, lastName;
+    std::cout << "First name: ";
+    std::cin >> firstName;
+    std::cout << "Surname: ";
+    std::cin >> lastName;
+    std::cout << "How many homework results to generate (1-20)? ";
+    int count = readNumber(std::cin, 1, 20);
 
+    std::vector<int> homework;
+    for (int i = 0; i < count; ++i) homework.push_back(randomResult());
+    int exam = randomResult();
+
+    std::cout << "  Generated homework:";
+    for (int result : homework) std::cout << " " << result;
+    std::cout << ", exam: " << exam << "\n";
+    return Person(firstName, lastName, homework, exam);
+}
+
+int main() {
+    std::cout << "1 - enter all data manually\n"
+              << "2 - enter names, generate homework and exam results randomly\n"
+              << "Choice: ";
+    int choice = readNumber(std::cin, 1, 2);
+
+    std::vector<Person> students;
     do {
         std::cout << "\nStudent " << students.size() + 1 << "\n";
-        Person person;
-        std::cin >> person;
-        students.push_back(person);
+        if (choice == 1) {
+            Person person;
+            std::cin >> person;
+            students.push_back(person);
+        } else {
+            students.push_back(generatePerson());
+        }
     } while (askYesNo("Add another student?"));
 
     Method method = askMethod();
