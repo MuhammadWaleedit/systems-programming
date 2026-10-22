@@ -22,6 +22,9 @@ All results use a 10-point grading scale.
 - [v0.25](#v025) - the same program with `std::list` and `std::deque`,
   speed analysis of all three containers.
 
+Each release has its own branch and tag (`v0.1`, `v0.2`, `v0.25`); `main`
+contains the latest version.
+
 ## v0.25
 
 ### Changes
